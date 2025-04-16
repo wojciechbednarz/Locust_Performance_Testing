@@ -1,8 +1,0 @@
-{
-  "id": 1,
-  "name": "Fluffy",
-  "photoUrls": ["https://example.com/photo.jpg"],
-  "category": {"id": 1, "name": "Dogs"},
-  "tags": [{"id": 1, "name": "Cute"}],
-  "status": "available"
-}
