@@ -1,28 +1,28 @@
 from locust import HttpUser, task
-from utilities import return_json_payload, change_data_in_the_json_file, create_pet_fake_name, create_fake_username
+from utilities import return_json_payload, get_modified_json_payload, create_pet_fake_name, create_fake_username
 import logging
 from copy import deepcopy
 
-PET_STORE_INVENTORY = '/store/inventory'
-PET_STORE_ORDER = '/store/order'
-PET_STORE_CREATE_PET = "/pet"
-PET_STORE_USER = "/user"
+PET_STORE_INVENTORY = 'https://petstore.swagger.io/v2/store/inventory'
+PET_STORE_ORDER = 'https://petstore.swagger.io/v2/store/order'
+PET_STORE_CREATE_PET = "https://petstore.swagger.io/v2/pet"
+PET_STORE_USER = "https://petstore.swagger.io/v2/user"
 
 logger = logging.getLogger(__name__)
 
-# class HelloWorldUser(HttpUser):
-#     """ Test class when user uses web_app Flask app. task(0) to prevent it from running. """
-#     abstract = True
-#     @task(0)
-#     def hello_world(self):
-#         self.client.get("/hello")
-#         self.client.get("/world")
-#
-# class UserBehaviour(HttpUser):
-#     """ Test class when user uses web_app Flask app. task(0) to prevent it from running. """
-#     @task(0)
-#     def test_homepage(self):
-#         self.client.get("/")
+class HelloWorldUser(HttpUser):
+    """ Test class when user uses web_app Flask app. task(0) to prevent it from running. """
+    abstract = True
+    @task(0)
+    def hello_world(self):
+        self.client.get("/hello")
+        self.client.get("/world")
+
+class UserBehaviour(HttpUser):
+    """ Test class when user uses web_app Flask app. task(0) to prevent it from running. """
+    @task(0)
+    def test_homepage(self):
+        self.client.get("/")
 
 
 class SwaggerPetStore(HttpUser):
@@ -32,56 +32,56 @@ class SwaggerPetStore(HttpUser):
     pet_order_payload = deepcopy(return_json_payload("pet_order.json"))
     user_create_payload = deepcopy(return_json_payload("user_create.json"))
 
+    all_users_payload_data = []
+
     def post_request(self, payload, url: str):
         with self.client.post(url=url, json=payload, catch_response=True) as response:
             if response.status_code == 200:
-                response.success("")
+                response.success()
                 return True
             else:
-                response.failure("")
+                response.failure("POST request error")
                 return False
 
-    def get_request(self, url: str, response=False):
+    def get_request(self, url: str):
         with self.client.get(url=url, catch_response=True) as response:
             if response.status_code == 200:
-                response.success("")
+                response.success()
                 content = response.json()
-                if response:
-                    return True, content
-                else:
-                    return True
+                return True, content
             else:
-                response.failure("")
-                return False
+                response.failure("GET request error")
+                return False, None
 
     def put_request(self, url: str, payload):
         with self.client.put(url=url, json=payload, catch_response=True) as response:
             if response.status_code == 200:
-                response.success("")
+                response.success()
                 return True
             else:
-                response.failure("")
+                response.failure("PUT request error")
                 return False
 
     def create_pet(self):
         logger.info("Start creation of the pet.")
         pet_name = create_pet_fake_name()
-        with change_data_in_the_json_file("pet_create.json", {"name": pet_name}):
-            create_pet = self.post_request(payload=self.pet_create_payload, url=PET_STORE_CREATE_PET)
-            if create_pet:
-                logger.info(f"Pet with name {pet_name} created successfully.")
-            else:
-                logger.error(f"Failed to create pet: {pet_name}")
+        pet_payload = get_modified_json_payload("pet_create.json", {"name": pet_name})
+        create_pet = self.post_request(payload=pet_payload, url=PET_STORE_CREATE_PET)
+        if create_pet:
+            logger.info(f"Pet with name {pet_name} created successfully.")
+        else:
+            logger.error(f"Failed to create pet: {pet_name}")
 
     def create_user(self):
         logger.info("Start creation of the new user.")
         user_name = create_fake_username()
-        with change_data_in_the_json_file("user_create.json", {"username": user_name}):
-            create_user = self.post_request(payload=self.user_create_payload, url=PET_STORE_USER)
-            if create_user:
-                logger.info(f"User with username {user_name} created successfully.")
-            else:
-                logger.error(f"Failed to create user with username: {user_name}")
+        user_payload = get_modified_json_payload("user_create.json", {"username": user_name})
+        self.all_users_payload_data.append(user_payload)
+        create_user = self.post_request(payload=user_payload, url=PET_STORE_USER)
+        if create_user:
+            logger.info(f"User with username {user_name} created successfully.")
+        else:
+            logger.error(f"Failed to create user with username: {user_name}")
 
     def on_start(self):
         """
@@ -97,7 +97,7 @@ class SwaggerPetStore(HttpUser):
 
     @task
     def get_pet_store_inventory_statuses(self):
-        response_status, content = self.get_request(PET_STORE_INVENTORY, response=True)
+        response_status, content = self.get_request(PET_STORE_INVENTORY)
         if response_status:
             inventory = content
             for status, count in inventory.items():
@@ -117,10 +117,13 @@ class SwaggerPetStore(HttpUser):
     @task
     def update_user_data(self):
         logger.info("Start updating user data.")
-        user_id = 0
-        payload = {"id": user_id, "firstName": "Adam"}
-        modify_user_name = self.put_request(payload=payload, url=PET_STORE_USER)
-        if modify_user_name:
-            logger.info(f"User with id {user_id} modified successfully.")
-        else:
-            logger.error(f"Failed to modify user with id: {user_id}.")
+        user_id = 1
+        if len(self.all_users_payload_data) != 0:
+            user_name_to_modify = self.all_users_payload_data[0]["username"]
+            url_to_modify = f"{PET_STORE_USER}/{user_name_to_modify}"
+            payload = {"id": user_id, "firstName": "Adam"}
+            modify_user_name = self.put_request(payload=payload, url=url_to_modify)
+            if modify_user_name:
+                logger.info(f"User with id {user_id} modified successfully.")
+            else:
+                logger.error(f"Failed to modify user with id: {user_id}.")
