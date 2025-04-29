@@ -30,3 +30,21 @@ class PetstoreRequests:
             else:
                 response.failure("PUT request error")
                 return False
+
+    def delete_request(self, url: str):
+        with self.client.delete(url=url, catch_response=True) as response:
+            if response.status_code == 200:
+                response.success()
+                return True
+            else:
+                response.failure("DELETE request error")
+                return False
+
+    def delete_request_expect_error_404(self, url: str):
+        with self.client.delete(url=url, catch_response=True) as response:
+            if response.status_code == 404:
+                response.success()
+                return True
+            else:
+                response.failure(f"Expected 404, got {response.status_code}")
+                return False

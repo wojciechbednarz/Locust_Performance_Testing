@@ -6,7 +6,7 @@ from copy import deepcopy
 
 PET_STORE_INVENTORY = 'https://petstore.swagger.io/v2/store/inventory'
 PET_STORE_ORDER = 'https://petstore.swagger.io/v2/store/order'
-PET_STORE_CREATE_PET = "https://petstore.swagger.io/v2/pet"
+PET_STORE_PET = "https://petstore.swagger.io/v2/pet"
 PET_STORE_USER = "https://petstore.swagger.io/v2/user"
 
 logger = logging.getLogger(__name__)
@@ -18,13 +18,15 @@ class PetTasks(TaskSet):
     pet_order_payload = deepcopy(return_json_payload("pet_order.json"))
     user_create_payload = deepcopy(return_json_payload("user_create.json"))
     all_users_payload_data = []
+    all_pets_payload_data = []
 
 
     def create_pet(self):
         logger.info("Start creation of the pet.")
         pet_name = create_pet_fake_name()
         pet_payload = get_modified_json_payload("pet_create.json", {"name": pet_name})
-        create_pet = self.req.post_request(payload=pet_payload, url=PET_STORE_CREATE_PET)
+        self.all_pets_payload_data.append(pet_payload)
+        create_pet = self.req.post_request(payload=pet_payload, url=PET_STORE_PET)
         if create_pet:
             logger.info(f"Pet with name {pet_name} created successfully.")
         else:
@@ -73,7 +75,7 @@ class PetTasks(TaskSet):
             logger.error("Order for purchasing the pet fail.")
 
     @task
-    def update_user_data(self):
+    def update_first_user_data(self):
         logger.info("Start updating user data.")
         user_id = 1
         if len(self.all_users_payload_data) != 0:
@@ -86,3 +88,10 @@ class PetTasks(TaskSet):
                 logger.info(f"User with id {user_id} modified successfully.")
             else:
                 logger.error(f"Failed to modify user with id: {user_id}.")
+
+    @task
+    def delete_non_existing_pet(self):
+        ids = [item["id"] for item in self.all_pets_payload_data if "id" in item]
+        out_of_range_id = (max(ids) + 1) if ids else 1
+        pet_to_delete_url = f"{PET_STORE_PET}/{out_of_range_id}"
+        self.req.delete_request_expect_error_404(url=pet_to_delete_url)
