@@ -70,7 +70,7 @@ class PetTasks(TaskSet):
     def place_an_order_for_a_pet(self):
         pet_order = self.req.post_request(self.pet_order_payload, PET_STORE_ORDER)
         if pet_order:
-            logger.info(f"Order for purchasing the pet success.")
+            logger.info("Order for purchasing the pet success.")
         else:
             logger.error("Order for purchasing the pet fail.")
 
